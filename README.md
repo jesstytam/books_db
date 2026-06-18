@@ -126,14 +126,24 @@ and
 docker exec -it postgres psql -U admin -d booktracker_db
 ```
 to explore or update the database.
+![books_table](assets/books_table.png)
 
 ### Connecting FastAPI app to Postgres DB
 
--everytime a script has been updated
+I used `psycopg` to connect the FastAPI application to the PostgreSQL database. The `/books` endpoint executed a SQL query against the database and returned the results as JSON.
+
+During development, whenever the application code or dependencies were updated, I rebuilt and restarted the containers using
+```
 docker compose down
 docker compose up --build
+```
+to ensure that the application image is using the most up-to-date code and dependencies.
 
-
+After deployment, I verified that the application was functioning as intended by querying
+```
+localhost:8000/books
+```
+![books_json](assets/books_json.png)
 
 ## :hammer_and_wrench: CI/CI pipeline
 
