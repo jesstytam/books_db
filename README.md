@@ -9,10 +9,10 @@ This repository documents the development of a simple book tracking application 
 
 ## Table of Contents
 
-<!-- - [Create application](#create-application)
-- [Containerisation](#containerisation)
+- [Create application](#create-application)
 - [CI/CD pipeline](#cicd-pipeline)
-- [Deployment](#deployment) -->
+- [Terraform](#terraform)
+- [Kubernetes](#kubernetes)
 
 ## :black_nib: Create application
 
@@ -149,10 +149,10 @@ localhost:8000/books
 
 coming soon...
 
-## :world_map: Deploy on Azure with Terraform
+## :world_map: Terraform
 
 coming soon...
 
-## :package: Manage containers with Kubernetes
+## :package: Kubernetes
 
 coming soon...
