@@ -1,8 +1,20 @@
 # :bookmark: Book tracker (WIP)
 
+<!-- <p align="left">
+  <a href="/github/actions/workflow/status/:user/:repo/:workflow"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/jesstytam/d20/.github%2Fworkflows%2Fdocker-image.yml" /></a>
+</p> -->
+
+
 This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I (1) built the simple app, (2) containerise them with **Docker**, (3) built a CI/CD with **GitHub Actions**, (4) provisioned the infrastructure using **Terraform**, and (5) orchestrated the containers with **Kubernetes**.
 
-## :black_nib: Creating the application
+## Table of Contents
+
+<!-- - [Create application](#create-application)
+- [Containerisation](#containerisation)
+- [CI/CD pipeline](#cicd-pipeline)
+- [Deployment](#deployment) -->
+
+## :black_nib: Create application
 
 The overview of the architecture in this section looks something like this when deployed on a local machine:
 ```
@@ -117,7 +129,11 @@ to explore or update the database.
 
 ### Connecting FastAPI app to Postgres DB
 
-coming soon...
+-everytime a script has been updated
+docker compose down
+docker compose up --build
+
+
 
 ## :hammer_and_wrench: CI/CI pipeline
 
