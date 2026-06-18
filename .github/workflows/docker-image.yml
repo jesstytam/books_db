@@ -17,9 +17,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Start Docker
-      run: docker compose up -d --build #run in detached mode so there's no need to detach it from the frontend
+      run: docker compose up -d --build #run in detached mode so the workflow can continue to subsequent test steps
 
-    - name: Wait for API to start
+    - name: Wait for API to start #allow fastapi and postgresql time to initialise before testing
       run: sleep 10
 
     - name: Show running containers
@@ -37,4 +37,4 @@ jobs:
 
     - name: Shutdown Docker
       if: always()
-      run: docker compose down #composes down even if tests fail
+      run: docker compose down #clean up containers even if a previous step fails

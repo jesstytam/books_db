@@ -147,7 +147,36 @@ localhost:8000/books
 
 ## :hammer_and_wrench: CI/CI pipeline
 
-coming soon...
+GitHub Actions was configured to automatically build and test the application whenever changes were pushed to the repository. The workflow launches the FastAPI and PostgreSQL containers using Docker Compose, waits for the services to initialise, verifies that the /health and /books endpoints return successful responses, and then removes the containers regardless of whether the tests pass or fail.
+
+```
+steps:
+
+    - uses: actions/checkout@v4
+
+    - name: Start Docker
+      run: docker compose up -d --build #run in detached mode so the workflow can continue to subsequent test steps
+
+    - name: Wait for API to start #allow fastapi and postgresql time to initialise before testing
+      run: sleep 10
+
+    - name: Show running containers
+      run: docker compose ps
+
+    - name: Check health endpoint status
+      run: curl --fail http://localhost:8000/health
+
+    - name: Check books endpoint status
+      run: curl --fail http://localhost:8000/books
+
+    - name: Show Docker logs if fail
+      if: failure()
+      run: docker compose logs
+
+    - name: Shutdown Docker
+      if: always()
+      run: docker compose down #clean up containers even if a previous step fails
+```
 
 ## :world_map: Terraform
 
