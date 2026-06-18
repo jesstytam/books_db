@@ -16,5 +16,15 @@ jobs:
 
     - uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: docker build -t books_db .
+    - name: Start Docker
+      run: docker compose up -d --build #run in detached mode so there's no need to detach it from the frontend
+
+    - name: Check health endpoint status
+      run: curl --fail http://localhost:8000/health
+
+    - name: Check books endpoint status
+      run: curl --fail http://localhost:8000/books
+
+    - name: Shutdown Docker
+      if: always()
+      run: docker compose down #composes down even if tests fail
