@@ -1,0 +1,24 @@
+services:
+  api:
+
+    build: . #builds app image
+    ports:
+      - "8000:8000" #host_port:container_port
+    depends_on:
+      - db #start db container before api
+
+  db:
+
+    container_name: postgres
+    image: postgres:17
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: booktracker_db
+
+    ports:
+      - "5432:5432" #default postgres port
+
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql #host_file:container_file

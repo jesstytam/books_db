@@ -8,8 +8,8 @@ CREATE TABLE books (
 
 --populate table
 INSERT INTO books (title, author, status)
-VALUES ("For the Emperor", "Sandy Mitchell", "read"),
-("The Hobbit", "J. R. R. Tolkien", "read"),
-("The Bell Jar", "Sylvia Plath", "read"),
-("Dracula", "Bram Stoker", "reading"),
-("The Master and Margarita", "Mikhail Bulgakov", "to be read");
+VALUES ('For the Emperor', 'Sandy Mitchell', 'read'),
+('The Hobbit', 'J. R. R. Tolkien', 'read'),
+('The Bell Jar', 'Sylvia Plath', 'read'),
+('Dracula', 'Bram Stoker', 'reading'),
+('The Master and Margarita', 'Mikhail Bulgakov', 'to be read');
