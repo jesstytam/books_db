@@ -236,7 +236,26 @@ Whenever the Azure infrastructure configuration changes, I ran `terraform plan` 
 
 ### GitHub Actions
 
-###
+Next, I updated GitHub Actions to push the application image to Azure while ensuring that the pipeline only proceeded during `push` events. These steps were added after Docker checks from previous steps.
+```
+    - name: Log in to Azure
+      uses: azure/login@v2
+      if: github.event_name=='push'
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Log in to ACR
+      if: github.event_name=='push'
+      run: az acr login --name booksdb
+
+    - name: Build image
+      if: github.event_name=='push'
+      run: docker build -t booksdb.azurecr.io/d20:latest .
+
+    - name: Push image
+      if: github.event_name=='push'
+      run: docker push booksdb.azurecr.io/d20:latest
+```
 
 ## :package: Kubernetes
 
