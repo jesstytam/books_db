@@ -191,7 +191,7 @@ docker run -p 8000:8000 books_db
 
 I then ran the following to build and run the containers
 ```
-docker compose up
+docker compose up --build
 docker compose down -v #removes associated Docker volumes and deletes any persisted database data
 ```
 
@@ -206,10 +206,6 @@ docker exec -it postgres psql -U admin -d booktracker_db
 to explore or update the database.
 ![books_table](assets/books_table.png)
 
-### Connecting FastAPI app to Postgres DB
-
-I used `psycopg` to connect the FastAPI application to the PostgreSQL database. The `/books` endpoint executed a SQL query against the database and returned the results as JSON.
-
 During development, whenever the application code or dependencies were updated, I rebuilt and restarted the containers using
 ```
 docker compose down
@@ -223,9 +219,13 @@ localhost:8000/books
 ```
 ![books_json](assets/books_json.png)
 
-## :hammer_and_wrench: CI/CI pipeline setup
+## :hammer_and_wrench: GitHub Actions
 
 GitHub Actions was configured to automatically build and test the application whenever changes were pushed to the repository. The workflow launches the FastAPI and PostgreSQL containers using Docker Compose, waits for the services to initialise, verifies that the /health and /books endpoints return successful responses, and then removes the containers regardless of whether the tests pass or fail.
+
+Next, I extended the GitHub Actions workflow to authenticate with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
+
+
 
 ```
 steps:
@@ -244,9 +244,6 @@ steps:
     - name: Check health endpoint status
       run: curl --fail http://localhost:8000/health
 
-    - name: Check books endpoint status
-      run: curl --fail http://localhost:8000/books
-
     - name: Show Docker logs if fail
       if: failure()
       run: docker compose logs
@@ -254,12 +251,7 @@ steps:
     - name: Shutdown Docker
       if: always()
       run: docker compose down #clean up containers even if a previous step fails
-```
 
-## GitHub Actions
-
-Next, I extended the GitHub Actions workflow to authenticate with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
-```
     - name: Log in to Azure
       uses: azure/login@v2
       if: github.event_name=='push'
@@ -278,8 +270,6 @@ Next, I extended the GitHub Actions workflow to authenticate with Azure and push
       if: github.event_name=='push'
       run: docker push booksdb.azurecr.io/d20:latest
 ```
-
-On Azure, check containtain register has a new repository
 
 ## :package: Kubernetes
 

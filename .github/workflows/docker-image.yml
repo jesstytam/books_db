@@ -28,8 +28,9 @@ jobs:
     - name: Check health endpoint status
       run: curl --fail http://localhost:8000/health
 
-    - name: Check books endpoint status
-      run: curl --fail http://localhost:8000/books
+    #this depends on azure
+    # - name: Check books endpoint status
+    #   run: curl --fail http://localhost:8000/books
 
     - name: Show Docker logs if fail
       if: failure()
