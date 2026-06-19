@@ -11,7 +11,7 @@ This repository documents the development of a simple book tracking application 
 
 - [Create application](#create-application)
 - [CI/CD pipeline](#cicd-pipeline)
-- [Terraform](#terraform)
+- [Deployment](#deployment)
 - [Kubernetes](#kubernetes)
 
 ## :black_nib: Create application
@@ -178,7 +178,9 @@ steps:
       run: docker compose down #clean up containers even if a previous step fails
 ```
 
-## :world_map: Terraform
+## :world_map: Deployment
+
+### Configure Azure deployment with Terraform
 
 Terraform is an Infrastructure as Code (IaC) tool that allows cloud infrastructure to be defined in configuration files, making resources easier to reproduce, review, and update.
 
@@ -231,6 +233,10 @@ terraform apply tfplan
 ```
 
 Whenever the Azure infrastructure configuration changes, I ran `terraform plan` to review the proposed changes before applying them with `terraform apply`.
+
+### GitHub Actions
+
+###
 
 ## :package: Kubernetes
 
