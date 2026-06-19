@@ -275,6 +275,8 @@ steps:
 
 ### Configure K8s on Azure with Terraform
 
+this step -> create kubernetes resource on azure and connect it with kubernetes locally to manage the containers
+
 create akc resource
 
 ```
@@ -359,52 +361,54 @@ No resources found in default namespace.
 ```
 
 
-### Deploy FastAPI application to K8s on Azure
+### Deploy FastAPI application and Postgres database to K8s on Azure
 
-create `deployment.yml` and `service.yml`
+create `deployment.yml`, `service.yml`, `db_deployment.yml`, `db_service.yml`, 
 
 run `kubectl apply -f k8s/` to create the deployment and service
 
 
-
 ```
 $ kubectl get pods
-NAME                                      READY   STATUS    RESTARTS   AGE
-booksdb-api-deployment-7b4ffb45c9-k2b6k   1/1     Running   0          2m4s
+NAME                                      READY   STATUS                       RESTARTS   AGE
+booksdb-api-deployment-7b4ffb45c9-wcs6l   1/1     Running                      0          74s
 ```
 
 ```
 $ kubectl get services
-NAME                  TYPE           CLUSTER-IP   EXTERNAL-IP     PORT(S)        AGE
-booksdb-api-service   LoadBalancer   10.0.49.15   20.70.103.209   80:31075/TCP   3m32s
-kubernetes            ClusterIP      10.0.0.1     <none>          443/TCP        38m
-
-```
-
-### Deploy Postgres DB to K8s on Azure
-
-create `db_deployment.yml` and `db_service.yml`
-
-run `kubectl apply -f k8s/` again to create the deployment and service
-
-
-```
-$ kubectl get pods
-NAME                                      READY   STATUS    RESTARTS   AGE
-booksdb-api-deployment-7b4ffb45c9-k2b6k   1/1     Running   0          13m
-postgres-79d96755c8-sw6g5                 1/1     Running   0          111s
-
-```
-
-
-```
-$ kubectl get service
-NAME                  TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)        AGE
-booksdb-api-service   LoadBalancer   10.0.49.15    20.70.103.209   80:31075/TCP   17m
-db                    ClusterIP      10.0.242.74   <none>          5432/TCP       2m7s
-kubernetes            ClusterIP      10.0.0.1      <none>          443/TCP        52m
+NAME                  TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)        AGE
+booksdb-api-service   LoadBalancer   10.0.133.121   20.70.74.200   80:32130/TCP   16s
+kubernetes            ClusterIP      10.0.0.1       <none>         443/TCP        3h30m
 
 ```
 
 
 run `kubectl logs <pod_name>` to check for errors
+
+navigate to external IP to see app and database
+
+remember to configure firewall
+
+get ip
+```
+AKS_OUTBOUND_IP=$(az network public-ip show \
+  --ids $(az aks show \
+    --resource-group portfolio-rg \
+    --name booksdb-k8 \
+    --query "networkProfile.loadBalancerProfile.effectiveOutboundIPs[0].id" \
+    -o tsv) \
+  --query ipAddress \
+  -o tsv)
+
+echo $AKS_OUTBOUND_IP
+```
+
+paste ip here
+```
+az postgres flexible-server firewall-rule create \
+  --resource-group portfolio-rg \
+  --name booksdbpg-server4 \
+  --rule-name allow-aks-outbound \
+  --start-ip-address $AKS_OUTBOUND_IP \
+  --end-ip-address $AKS_OUTBOUND_IP
+```
