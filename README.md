@@ -226,13 +226,22 @@ and verified that the application can be deployed on Azure properly. I also made
 ```
 terraform plan -out=tfplan
 ```
+and confirm that we are ouly creating one resource, as stated in the output `Plan: 1 to add, 0 to change, 0 to destroy`.
 
 Finally, I applied the plan we created as follows
 ```
 terraform apply tfplan
 ```
 
+I ran the following to check the state and confirm that Terraform is tracking the registry.
+```
+terraform shorm
+terraform state list
+```
+
 Whenever the Azure infrastructure configuration changes, I ran `terraform plan` to review the proposed changes before applying them with `terraform apply`.
+
+To minimise cloud costs during development, infrastructure was provisioned through Terraform and could be recreated or removed on demand using `terraform apply` and `terraform destroy`.
 
 ### GitHub Actions
 
@@ -257,8 +266,80 @@ Next, I extended the GitHub Actions workflow to authenticate with Azure and push
       run: docker push booksdb.azurecr.io/d20:latest
 ```
 
-###
+On Azure, check containtain register has a new repository
 
 ## :package: Kubernetes
 
-coming soon...
+create akc resource
+
+```
+resource "azurerm_kubernetes_cluster" "aks" {
+  name = var.azurerm_kubernetes_cluster
+  location = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  #kubernetes setup
+  dns_prefix          = "booksdb"
+  default_node_pool {
+    name       = "default" #larger companies may have frontend-pool, backend-pool, etc.
+    node_count = 1 
+    vm_size    = "Standard_B2s"
+  }
+  identity {
+    type = "SystemAssigned" #creates AKS Identity for assigning permissions to
+  }
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  principal_id = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id #kublet_identity will exist after aks is created
+  role_definition_name = "AcrPull"
+  scope = azurerm_container_registry.acr.id
+  skip_service_principal_aad_check = true
+}
+```
+
+run terraform plan -out=tfplan to check that we are creating two resources `Plan: 2 to add, 0 to change, 0 to destroy`.
+
+connect az to local kubernetes
+
+```
+$ az aks get-credentials \
+  --resource-group portfolio-rg \
+  --name booksdb-k8
+```
+
+see nodes
+```
+$ kubectl get nodes
+NAME                              STATUS   ROLES    AGE     VERSION
+aks-default-30271418-vmss000000   Ready    <none>   9m47s   v1.34.8
+```
+
+
+```
+$ kubectl get pods -A
+NAMESPACE     NAME                                           READY   STATUS    RESTARTS   AGE
+kube-system   azure-cns-2l6b7                                1/1     Running   0          11m
+kube-system   azure-ip-masq-agent-4474n                      1/1     Running   0          11m
+kube-system   cloud-node-manager-9859c                       1/1     Running   0          11m
+kube-system   coredns-779f9587cb-m8pnq                       1/1     Running   0          11m
+kube-system   coredns-779f9587cb-sbwqn                       1/1     Running   0          10m
+kube-system   coredns-autoscaler-7b4685fdfc-smws2            1/1     Running   0          11m
+kube-system   csi-azuredisk-node-rdpv4                       3/3     Running   0          11m
+kube-system   csi-azurefile-node-mrf49                       4/4     Running   0          11m
+kube-system   konnectivity-agent-7fc4d4987c-fwmsk            1/1     Running   0          11m
+kube-system   konnectivity-agent-7fc4d4987c-h2z42            1/1     Running   0          10m
+kube-system   konnectivity-agent-autoscaler-95f4794f-9cb6g   1/1     Running   0          11m
+kube-system   kube-proxy-l5x75                               1/1     Running   0          11m
+kube-system   metrics-server-5f5fbb69b-p2bg7                 2/2     Running   0          10m
+kube-system   metrics-server-5f5fbb69b-xkbs5                 2/2     Running   0          10m
+```
+
+
+```
+$ kubectl get namespaces
+NAME              STATUS   AGE
+default           Active   13m
+kube-node-lease   Active   13m
+kube-public       Active   13m
+kube-system       Active   13m
+```

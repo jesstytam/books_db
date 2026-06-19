@@ -5,3 +5,7 @@ variable "resource_group_name" {
 variable "container_registry_name" {
   type = string
 }
+
+variable "azurerm_kubernetes_cluster" {
+  type = string
+}
