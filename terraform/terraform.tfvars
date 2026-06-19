@@ -1,3 +1,7 @@
 resource_group_name = "portfolio-rg"
 container_registry_name = "booksdb"
 azurerm_kubernetes_cluster = "booksdb-k8"
+postgres_server_name     = "booksdbpg-server4"
+postgres_admin_username  = "bookadmin"
+postgres_admin_password  = "Password123!"
+postgres_database_name   = "booktracker_db"

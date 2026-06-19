@@ -12,16 +12,28 @@ def get_health():
 @app.get("/books")
 def get_books():
     conn = psycopg.connect(
-        host="db",
+        host="booksdbpg-server4.postgres.database.azure.com",
         dbname="booktracker_db",
-        user="admin",
-        password="password"
+        user="bookadmin",
+        password="Password123!",
+        sslmode="require"
     )
+
     cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM books;"
-    )
-    books = cur.fetchall()
+    cur.execute("SELECT id, title, author, status FROM books;")
+    rows = cur.fetchall()
+
+    books = [
+        {
+            "id": row[0],
+            "title": row[1],
+            "author": row[2],
+            "status": row[3],
+        }
+        for row in rows
+    ]
+
     cur.close()
     conn.close()
+
     return {"books": books}

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booksdb-api-deployment
+spec:
+  selector:
+    matchLabels:
+      app: booksdb-api
+  replicas: 1 #tells deployment to run 1 pod matching the template
+  template:
+    metadata:
+      labels:
+        app: booksdb-api
+    spec:
+      containers:
+      - name: booksdb-api
+        image: booksdb.azurecr.io/booksdb:latest #this is already on acr
+        ports:
+        - containerPort: 8000

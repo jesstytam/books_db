@@ -9,14 +9,118 @@ This repository documents the development of a simple book tracking application 
 
 ## Table of Contents
 
+- [Configure Azure environment with Terraform](#world_map-configure-azure-environment-with-terraform)
 - [Create application](#create-application)
 - [CI/CD pipeline setup](#cicd-pipeline-setup)
 - [Deployment](#deployment)
 - [Kubernetes](#kubernetes)
 
+## :world_map: Configure Azure environment with Terraform
+
+Terraform is an Infrastructure as Code (IaC) tool that allows cloud infrastructure to be defined in configuration files, making resources easier to reproduce, review, and update.
+
+I created three Terraform files: `main.tf`, `variables.tf`, and `terraform.tfvars`. The main configuration references an existing Azure Resource Group and creates a new Azure Container Registry.
+
+```
+# Configure the Azure provider
+
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+  required_version = ">= 1.1.0"
+}
+
+provider "azurerm" {
+  features {}
+}
+
+#call existing resource
+data "azurerm_resource_group" "rg" {
+  name = var.resource_group_name
+}
+
+#create container registry
+resource "azurerm_container_registry" "acr" {
+  name = var.container_registry_name
+  resource_group_name = data.azurerm_resource_group.rg.name
+  location = data.azurerm_resource_group.rg.location
+  sku = "Basic"
+  admin_enabled = false
+}
+```
+
+To host the Postgres database on Azure, I created the file `postgres.tf` with the following:
+```
+#create managed PostgreSQL server
+resource "azurerm_postgresql_flexible_server" "postgres" {
+  name                   = var.postgres_server_name
+  resource_group_name    = data.azurerm_resource_group.rg.name
+  location               = data.azurerm_resource_group.rg.location
+  version                = "16"
+
+  administrator_login    = var.postgres_admin_username
+  administrator_password = var.postgres_admin_password
+
+  sku_name   = "B_Standard_B1ms"
+  storage_mb = 32768
+}
+
+#create database
+resource "azurerm_postgresql_flexible_server_database" "books" {
+  name      = var.postgres_database_name
+  server_id = azurerm_postgresql_flexible_server.postgres.id
+  charset   = "UTF8"
+  collation = "en_US.utf8"
+}
+```
+
+I then initialised the Terraform directories by running
+```
+terraform init
+```
+I generated a saved execution plan to review the proposed infrastructure changes before applying them
+```
+terraform plan -out=tfplan
+```
+The plan output showed the expected resources to be created, for example `Plan: 3 to add, 0 to change, 0 to destroy`.
+
+I then applied the saved plan
+```
+terraform apply tfplan
+```
+
+I ran the following to check the state and confirm that Terraform is tracking the registry.
+```
+terraform show
+terraform state list
+```
+
+Whenever the Azure infrastructure configuration changes, I ran `terraform plan -out=tfplan` to review the proposed changes before applying them with `terraform apply`.
+
+To minimise cloud costs during development, infrastructure was provisioned through Terraform and could be recreated or removed on demand using `terraform apply` and `terraform destroy`.
+
+
+- check that the db exists
+```
+$ az postgres flexible-server list \
+  --resource-group portfolio-rg \
+  --output table
+Name               Resource Group    Location        Version    Storage Size(GiB)    Tier       SKU            State    HA State    Availability zone
+-----------------  ----------------  --------------  ---------  -------------------  ---------  -------------  -------  ----------  -------------------
+booksdbpg-server2  portfolio-rg      Australia East  16         32                   Burstable  Standard_B1ms  Ready    NotEnabled  3
+```
+
+
+
+
+
 ## :black_nib: Create application
 
-The overview of the architecture in this section looks something like this when deployed on a local machine:
+<!-- The overview of the architecture in this section looks something like this when deployed on a local machine:
 ```
 Browser
    |
@@ -27,11 +131,11 @@ FastAPI Container
 Docker Network
    |
 PostgreSQL Container
-```
+``` -->
 
 ### Setting up FastAPI
 
-To verify that `FastAPI` was configured correctly, I first created a simple `"hello world"` endpoint and served it locally using `uvicorn`.
+To create a `FastAPI` app, I first created a simple `"hello world"` endpoint and served it locally using `uvicorn`.
 
 Afterwards, I wrote the `Dockerfile` to containerise the app, with instructions to install dependencies.
 
@@ -62,27 +166,9 @@ docker run -p 8000:8000 books_db
 
 ### Setting up Postgres DB
 
-To generate the Postgres database, I wrote an SQL script with instructions to create and populate a table of five books, their authors, and book status. 
+To generate the Postgres database, I wrote an SQL script with instructions to create and populate a table of five books, their authors, and book status. Wrapped around with a quick shell script `upload_db.sh`, it was then uploaded directly to Azure.
 
-```
---create table
-CREATE TABLE books (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(255),
-    author VARCHAR(255),
-    status VARCHAR(255)
-);
-
---populate table
-INSERT INTO books (title, author, status)
-VALUES ('For the Emperor', 'Sandy Mitchell', 'read'),
-('The Hobbit', 'J. R. R. Tolkien', 'read'),
-('The Bell Jar', 'Sylvia Plath', 'read'),
-('Dracula', 'Bram Stoker', 'reading'),
-('The Master and Margarita', 'Mikhail Bulgakov', 'to be read');
-```
-
-Then, I wrote `docker-compose.yml` that defines the instructions to management the deployment of multiple Docker containers involved in this project.
+Afterwards, `docker-compose.yml` was created to define the instructions to manage the deployment of the Dockerised application in this project.
 
 ```
 services:
@@ -93,25 +179,17 @@ services:
       - "8000:8000" #host_port:container_port
     depends_on:
       - db #start db container before api
-
-  db:
-
-    container_name: postgres
-    image: postgres:17
-
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: booktracker_db
-
-    ports:
-      - "5432:5432" #default postgres port
-
-    volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql #host_file:container_file
 ```
 
-And then ran the following to build and run the containers
+To build the containerised image of the database and launch it, I ran
+
+```
+docker build -t books_db .
+docker run -p 8000:8000 books_db
+```
+
+
+I then ran the following to build and run the containers
 ```
 docker compose up
 docker compose down -v #removes associated Docker volumes and deletes any persisted database data
@@ -178,72 +256,7 @@ steps:
       run: docker compose down #clean up containers even if a previous step fails
 ```
 
-## :world_map: Deployment
-
-### Configure Azure deployment with Terraform
-
-Terraform is an Infrastructure as Code (IaC) tool that allows cloud infrastructure to be defined in configuration files, making resources easier to reproduce, review, and update.
-
-I created three Terraform files: `main.tf`, `variables.tf`, and `terraform.tfvars`. The main configuration references an existing Azure Resource Group and creates a new Azure Container Registry.
-
-```
-# Configure the Azure provider
-
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 4.0"
-    }
-  }
-  required_version = ">= 1.1.0"
-}
-
-provider "azurerm" {
-  features {}
-}
-
-#call existing resource
-data "azurerm_resource_group" "rg" {
-  name = var.resource_group_name
-}
-
-#create container registry
-resource "azurerm_container_registry" "acr" {
-  name = var.container_registry_name
-  resource_group_name = data.azurerm_resource_group.rg.name
-  location = data.azurerm_resource_group.rg.location
-  sku = "Basic"
-  admin_enabled = false
-}
-```
-
-I then initialised terraform directories by running
-```
-terraform init
-```
-and verified that the application can be deployed on Azure properly. I also made sure to save the plan for reproducibility
-```
-terraform plan -out=tfplan
-```
-and confirm that we are ouly creating one resource, as stated in the output `Plan: 1 to add, 0 to change, 0 to destroy`.
-
-Finally, I applied the plan we created as follows
-```
-terraform apply tfplan
-```
-
-I ran the following to check the state and confirm that Terraform is tracking the registry.
-```
-terraform shorm
-terraform state list
-```
-
-Whenever the Azure infrastructure configuration changes, I ran `terraform plan` to review the proposed changes before applying them with `terraform apply`.
-
-To minimise cloud costs during development, infrastructure was provisioned through Terraform and could be recreated or removed on demand using `terraform apply` and `terraform destroy`.
-
-### GitHub Actions
+## GitHub Actions
 
 Next, I extended the GitHub Actions workflow to authenticate with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
 ```
@@ -269,6 +282,8 @@ Next, I extended the GitHub Actions workflow to authenticate with Azure and push
 On Azure, check containtain register has a new repository
 
 ## :package: Kubernetes
+
+### Configure K8s on Azure with Terraform
 
 create akc resource
 
@@ -307,6 +322,9 @@ $ az aks get-credentials \
   --name booksdb-k8
 ```
 
+
+on local pc, use kubectl
+
 see nodes
 ```
 $ kubectl get nodes
@@ -343,3 +361,60 @@ kube-node-lease   Active   13m
 kube-public       Active   13m
 kube-system       Active   13m
 ```
+
+we can see that we havent deployed the app yet
+```
+$ kubectl get pods
+No resources found in default namespace.
+```
+
+
+### Deploy FastAPI application to K8s on Azure
+
+create `deployment.yml` and `service.yml`
+
+run `kubectl apply -f k8s/` to create the deployment and service
+
+
+
+```
+$ kubectl get pods
+NAME                                      READY   STATUS    RESTARTS   AGE
+booksdb-api-deployment-7b4ffb45c9-k2b6k   1/1     Running   0          2m4s
+```
+
+```
+$ kubectl get services
+NAME                  TYPE           CLUSTER-IP   EXTERNAL-IP     PORT(S)        AGE
+booksdb-api-service   LoadBalancer   10.0.49.15   20.70.103.209   80:31075/TCP   3m32s
+kubernetes            ClusterIP      10.0.0.1     <none>          443/TCP        38m
+
+```
+
+### Deploy Postgres DB to K8s on Azure
+
+create `db_deployment.yml` and `db_service.yml`
+
+run `kubectl apply -f k8s/` again to create the deployment and service
+
+
+```
+$ kubectl get pods
+NAME                                      READY   STATUS    RESTARTS   AGE
+booksdb-api-deployment-7b4ffb45c9-k2b6k   1/1     Running   0          13m
+postgres-79d96755c8-sw6g5                 1/1     Running   0          111s
+
+```
+
+
+```
+$ kubectl get service
+NAME                  TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)        AGE
+booksdb-api-service   LoadBalancer   10.0.49.15    20.70.103.209   80:31075/TCP   17m
+db                    ClusterIP      10.0.242.74   <none>          5432/TCP       2m7s
+kubernetes            ClusterIP      10.0.0.1      <none>          443/TCP        52m
+
+```
+
+
+run `kubectl logs <pod_name>` to check for errors
