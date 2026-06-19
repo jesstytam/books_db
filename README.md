@@ -180,7 +180,26 @@ steps:
 
 ## :world_map: Terraform
 
-coming soon...
+Terraform is an infrastructure as code platform that simplifies and enables the reproducibility of cloud deployment infrastructures. 
+
+3 files to define workflow and variables
+
+initialise terraform directories
+```
+terraform init
+```
+
+verify the app can be deployed on azure properly + save the plan for reproducibility
+```
+terraform plan -out=tfplan
+```
+
+apply the plan we created
+```
+terraform apply tfplan
+```
+
+run plan and apply as azure infrastructure changes.
 
 ## :package: Kubernetes
 
