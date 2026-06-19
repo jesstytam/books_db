@@ -1,8 +1,8 @@
 # :bookmark: Book tracker (WIP)
 
-<!-- <p align="left">
-  <a href="/github/actions/workflow/status/:user/:repo/:workflow"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/jesstytam/d20/.github%2Fworkflows%2Fdocker-image.yml" /></a>
-</p> -->
+<p align="left">
+  <a href="/github/actions/workflow/status/:user/:repo/:workflow"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/jesstytam/books_db/.github%2Fworkflows%2Fdocker-image.yml" /></a>
+</p>
 
 
 This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I (1) built the simple app, (2) containerise them with **Docker**, (3) built a CI/CD with **GitHub Actions**, (4) provisioned the infrastructure using **Terraform**, and (5) orchestrated the containers with **Kubernetes**.
@@ -180,26 +180,57 @@ steps:
 
 ## :world_map: Terraform
 
-Terraform is an infrastructure as code platform that simplifies and enables the reproducibility of cloud deployment infrastructures. 
+Terraform is an Infrastructure as Code (IaC) tool that allows cloud infrastructure to be defined in configuration files, making resources easier to reproduce, review, and update.
 
-3 files to define workflow and variables
+I created three Terraform files: `main.tf`, `variables.tf`, and `terraform.tfvars`. The main configuration references an existing Azure Resource Group and creates a new Azure Container Registry.
 
-initialise terraform directories
+```
+# Configure the Azure provider
+
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+  required_version = ">= 1.1.0"
+}
+
+provider "azurerm" {
+  features {}
+}
+
+#call existing resource
+data "azurerm_resource_group" "rg" {
+  name = var.resource_group_name
+}
+
+#create container registry
+resource "azurerm_container_registry" "acr" {
+  name = var.container_registry_name
+  resource_group_name = data.azurerm_resource_group.rg.name
+  location = data.azurerm_resource_group.rg.location
+  sku = "Basic"
+  admin_enabled = false
+}
+```
+
+I then initialised terraform directories by running
 ```
 terraform init
 ```
-
-verify the app can be deployed on azure properly + save the plan for reproducibility
+and verified that the application can be deployed on Azure properly. I also made sure to save the plan for reproducibility
 ```
 terraform plan -out=tfplan
 ```
 
-apply the plan we created
+Finally, I applied the plan we created as follows
 ```
 terraform apply tfplan
 ```
 
-run plan and apply as azure infrastructure changes.
+Whenever the Azure infrastructure configuration changes, I ran `terraform plan` to review the proposed changes before applying them with `terraform apply`.
 
 ## :package: Kubernetes
 
