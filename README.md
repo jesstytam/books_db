@@ -5,12 +5,12 @@
 </p>
 
 
-This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I (1) built the simple app, (2) containerise them with **Docker**, (3) built a CI/CD with **GitHub Actions**, (4) provisioned the infrastructure using **Terraform**, and (5) orchestrated the containers with **Kubernetes**.
+This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I (1) built the simple app, (2) containerise them with **Docker**, (3) built a CI/CD with **GitHub Actions**, (4) provisioned Azure infrastructure using **Terraform**, and (5) orchestrated the containers with **Kubernetes**.
 
 ## Table of Contents
 
 - [Create application](#create-application)
-- [CI/CD pipeline](#cicd-pipeline)
+- [CI/CD pipeline setup](#cicd-pipeline-setup)
 - [Deployment](#deployment)
 - [Kubernetes](#kubernetes)
 
@@ -145,7 +145,7 @@ localhost:8000/books
 ```
 ![books_json](assets/books_json.png)
 
-## :hammer_and_wrench: CI/CI pipeline
+## :hammer_and_wrench: CI/CI pipeline setup
 
 GitHub Actions was configured to automatically build and test the application whenever changes were pushed to the repository. The workflow launches the FastAPI and PostgreSQL containers using Docker Compose, waits for the services to initialise, verifies that the /health and /books endpoints return successful responses, and then removes the containers regardless of whether the tests pass or fail.
 
@@ -236,7 +236,7 @@ Whenever the Azure infrastructure configuration changes, I ran `terraform plan` 
 
 ### GitHub Actions
 
-Next, I updated GitHub Actions to push the application image to Azure while ensuring that the pipeline only proceeded during `push` events. These steps were added after Docker checks from previous steps.
+Next, I extended the GitHub Actions workflow to authenticate with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
 ```
     - name: Log in to Azure
       uses: azure/login@v2
@@ -256,6 +256,8 @@ Next, I updated GitHub Actions to push the application image to Azure while ensu
       if: github.event_name=='push'
       run: docker push booksdb.azurecr.io/d20:latest
 ```
+
+###
 
 ## :package: Kubernetes
 
