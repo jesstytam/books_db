@@ -1,4 +1,4 @@
-# :bookmark: Book tracker (WIP)
+# :bookmark: Book tracker
 
 <p align="left">
   <a href="/github/actions/workflow/status/:user/:repo/:workflow"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/jesstytam/books_db/.github%2Fworkflows%2Fdocker-image.yml" /></a>
@@ -185,7 +185,6 @@ After deployment, I verified that the application was functioning as intended by
 ```
 localhost:8000/books
 ```
-![books_json](assets/books_json.png)
 
 ## :hammer_and_wrench: GitHub Actions
 
@@ -337,8 +336,8 @@ and the following to show the live services:
 ```
 $ kubectl get services
 NAME                  TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)        AGE
-booksdb-api-service   LoadBalancer   10.0.133.121   20.70.74.200   80:32130/TCP   16s
-kubernetes            ClusterIP      10.0.0.1       <none>         443/TCP        3h30m
+booksdb-api-service   LoadBalancer   <cluster-ip>   <external-ip>  80:32130/TCP   16s
+kubernetes            ClusterIP      <cluster-ip>   <none>         443/TCP        3h30m
 ```
 
 To explore the logs and potential errors, I ran the following:
@@ -347,7 +346,7 @@ kubectl logs <pod_name>
 ```
 
 Finally, I queried the external IP to confirm that the deployed API could reach the managed PostgreSQL database:
-![]()
+![books_json](assets/books_json.png)
 
 ### Firewall configuration
 
