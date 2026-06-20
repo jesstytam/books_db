@@ -5,21 +5,20 @@
 </p>
 
 
-This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I (1) built the simple app, (2) containerise them with **Docker**, (3) built a CI/CD with **GitHub Actions**, (4) provisioned Azure infrastructure using **Terraform**, and (5) orchestrated the containers with **Kubernetes**.
+This repository documents the development of a simple book tracking application using FastAPI and PostgreSQL. Here, I first (1) provisioned storage and other resources on **Azure** using **Terraform**, (2) built the simple app containerised it with **Docker**, (3) built a CI/CD pipeline with **GitHub Actions**, and (4) orchestrated the cloud containers with **Kubernetes**.
 
 ## Table of Contents
 
-- [Configure Azure environment with Terraform](#world_map-configure-azure-environment-with-terraform)
-- [Create application](#create-application)
-- [CI/CD pipeline setup](#cicd-pipeline-setup)
-- [Deployment](#deployment)
-- [Kubernetes](#kubernetes)
+- [Configure Azure with Terraform](#world_map-configure-azure-environment-with-terraform)
+- [Create and containerise application](#black_nib-create-application)
+- [CI/CD pipeline setup](#hammer_and_wrench-github-actions)
+- [Deployment](#package-deployment)
 
 ## :world_map: Configure Azure environment with Terraform
 
 Terraform is an Infrastructure as Code (IaC) tool that allows cloud infrastructure to be defined in configuration files, making resources easier to reproduce, review, and update.
 
-I created three Terraform files: `main.tf`, `variables.tf`, and `terraform.tfvars`. The main configuration references an existing Azure Resource Group and creates a new Azure Container Registry.
+To begin, I created three Terraform files: `main.tf`, `postgres.tf`, `variables.tf`, and `terraform.tfvars` to create the necessary resources on Azure, including a Container Registry and Postgres server:
 
 ```
 # Configure the Azure provider
@@ -51,10 +50,7 @@ resource "azurerm_container_registry" "acr" {
   sku = "Basic"
   admin_enabled = false
 }
-```
 
-To host the Postgres database on Azure, I created the file `postgres.tf` with the following:
-```
 #create managed PostgreSQL server
 resource "azurerm_postgresql_flexible_server" "postgres" {
   name                   = var.postgres_server_name
@@ -78,45 +74,41 @@ resource "azurerm_postgresql_flexible_server_database" "books" {
 }
 ```
 
-I then initialised the Terraform directories by running
+I then initialised the Terraform directories by running:
 ```
 terraform init
 ```
-I generated a saved execution plan to review the proposed infrastructure changes before applying them
+and generated a saved execution plan to review the proposed infrastructure changes before applying them:
 ```
 terraform plan -out=tfplan
 ```
 The plan output showed the expected resources to be created, for example `Plan: 3 to add, 0 to change, 0 to destroy`.
 
-I then applied the saved plan
+I then applied the saved plan:
 ```
 terraform apply tfplan
 ```
 
-I ran the following to check the state and confirm that Terraform is tracking the registry.
+I ran the following to check the state and confirm that Terraform is tracking the registry:
 ```
 terraform show
 terraform state list
 ```
 
-Whenever the Azure infrastructure configuration changes, I ran `terraform plan -out=tfplan` to review the proposed changes before applying them with `terraform apply`.
+Whenever the Azure infrastructure configuration changed, I ran `terraform plan -out=tfplan` again to review the proposed changes before applying them with `terraform apply`. 
 
 To minimise cloud costs during development, infrastructure was provisioned through Terraform and could be recreated or removed on demand using `terraform apply` and `terraform destroy`.
 
-
-- check that the db exists
+I also checked that the db exists by running:
 ```
 $ az postgres flexible-server list \
   --resource-group portfolio-rg \
   --output table
+
 Name               Resource Group    Location        Version    Storage Size(GiB)    Tier       SKU            State    HA State    Availability zone
 -----------------  ----------------  --------------  ---------  -------------------  ---------  -------------  -------  ----------  -------------------
-booksdbpg-server2  portfolio-rg      Australia East  16         32                   Burstable  Standard_B1ms  Ready    NotEnabled  3
+booksdbpg-server4  portfolio-rg      <location>      16         32                   Burstable  Standard_B1ms  Ready    NotEnabled  3
 ```
-
-
-
-
 
 ## :black_nib: Create application
 
@@ -135,10 +127,9 @@ PostgreSQL Container
 
 ### Setting up FastAPI
 
-To create a `FastAPI` app, I first created a simple `"hello world"` endpoint and served it locally using `uvicorn`.
+To create a `FastAPI` app, I first created two endpoints and served it locally using `uvicorn`.
 
-Afterwards, I wrote the `Dockerfile` to containerise the app, with instructions to install dependencies.
-
+Afterwards, I wrote `Dockerfile` to containerise the app, with instructions to install the required dependencies:
 ```
 #get docker image
 FROM python:3.12-slim
@@ -157,8 +148,7 @@ COPY . .
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-To build the containerised image and launch it there, I ran
-
+I then built the Docker image and launched the application by running:
 ```
 docker build -t books_db .
 docker run -p 8000:8000 books_db
@@ -166,10 +156,13 @@ docker run -p 8000:8000 books_db
 
 ### Setting up Postgres DB
 
-To generate the Postgres database, I wrote an SQL script with instructions to create and populate a table of five books, their authors, and book status. Wrapped around with a quick shell script `upload_db.sh`, it was then uploaded directly to Azure.
+The application stored book information in a PostgreSQL database hosted on Azure Database for PostgreSQL. To initialise the database, I created an SQL script `init.sql` that contained instructions to create a table and populate it with five books, their authors, and reading status.
 
-Afterwards, `docker-compose.yml` was created to define the instructions to manage the deployment of the Dockerised application in this project.
+To simplify database deployment, I created a shell script `upload_db.sh` which executed the SQL script against the Azure PostgreSQL instance.
 
+### Managing Docker container
+
+After the application and database had been configured, `docker-compose.yml` was created to manage the Dockerised application:
 ```
 services:
   api:
@@ -177,43 +170,18 @@ services:
     build: . #builds app image
     ports:
       - "8000:8000" #host_port:container_port
-    depends_on:
-      - db #start db container before api
 ```
 
-To build the containerised image of the database and launch it, I ran
-
-```
-docker build -t books_db .
-docker run -p 8000:8000 books_db
-```
-
-
-I then ran the following to build and run the containers
+The application could then be built by running:
 ```
 docker compose up --build
-docker compose down -v #removes associated Docker volumes and deletes any persisted database data
 ```
-
-While the container is still running, in another terminal, I checked that their statuses by running
-```
-docker ps
-```
-and 
-```
-docker exec -it postgres psql -U admin -d booktracker_db
-```
-to explore or update the database.
-![books_table](assets/books_table.png)
-
-During development, whenever the application code or dependencies were updated, I rebuilt and restarted the containers using
+or the following to stop the application:
 ```
 docker compose down
-docker compose up --build
 ```
-to ensure that the application image is using the most up-to-date code and dependencies.
 
-After deployment, I verified that the application was functioning as intended by querying
+After deployment, I verified that the application was functioning as intended by querying:
 ```
 localhost:8000/books
 ```
@@ -221,12 +189,11 @@ localhost:8000/books
 
 ## :hammer_and_wrench: GitHub Actions
 
-GitHub Actions was configured to automatically build and test the application whenever changes were pushed to the repository. The workflow launches the FastAPI and PostgreSQL containers using Docker Compose, waits for the services to initialise, verifies that the /health and /books endpoints return successful responses, and then removes the containers regardless of whether the tests pass or fail.
+GitHub Actions was configured to automatically build and test the application whenever changes were pushed to the repository. The workflow launched the FastAPI application container using Docker Compose, waits for the services to initialise, verified that the /health endpoint returned successful responses, and then removed the container regardless of whether the tests pass or fail.
 
-Next, I extended the GitHub Actions workflow to authenticate with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
+The workflow then uthenticated with Azure and push the application image to Azure Container Registry. These steps were executed only during `push` events and were placed after the Docker Compose integration tests to ensure that only validated images were published.
 
-
-
+The GitHub Actions workflow contained the following:
 ```
 steps:
 
@@ -271,15 +238,13 @@ steps:
       run: docker push booksdb.azurecr.io/d20:latest
 ```
 
-## :package: Kubernetes
+## :package: Deployment
 
-### Configure K8s on Azure with Terraform
+### Configure Kubernetes on Azure with Terraform
 
-this step -> create kubernetes resource on azure and connect it with kubernetes locally to manage the containers
-
-create akc resource
-
+Before being able to manage the Docker application with Kubernetes on Azure, I first created the Azure Kubernetes Cluster resource to request a virtual machine to host the application using the following `.tf` script:
 ```
+#create aks
 resource "azurerm_kubernetes_cluster" "aks" {
   name = var.azurerm_kubernetes_cluster
   location = data.azurerm_resource_group.rg.location
@@ -296,6 +261,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 }
 
+#assign role to github repo
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id #kublet_identity will exist after aks is created
   role_definition_name = "AcrPull"
@@ -304,27 +270,22 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
 }
 ```
 
-run terraform plan -out=tfplan to check that we are creating two resources `Plan: 2 to add, 0 to change, 0 to destroy`.
+I then ran `terraform plan -out=tfplan` to update the Terraform state and confirm that I was creating two new resources by looking out for `Plan: 2 to add, 0 to change, 0 to destroy` in the output.
 
-connect az to local kubernetes
-
+After creating the resources on Azure, I connected Azure to Kubernetes locally by running:
 ```
 $ az aks get-credentials \
   --resource-group portfolio-rg \
   --name booksdb-k8
 ```
 
-
-on local pc, use kubectl
-
-see nodes
+On my local terminal, to confirm that the resources were connected and running, I printed the information of the Kubernetes nodes with the following:
 ```
 $ kubectl get nodes
 NAME                              STATUS   ROLES    AGE     VERSION
 aks-default-30271418-vmss000000   Ready    <none>   9m47s   v1.34.8
 ```
-
-
+pods with the following:
 ```
 $ kubectl get pods -A
 NAMESPACE     NAME                                           READY   STATUS    RESTARTS   AGE
@@ -343,8 +304,7 @@ kube-system   kube-proxy-l5x75                               1/1     Running   0
 kube-system   metrics-server-5f5fbb69b-p2bg7                 2/2     Running   0          10m
 kube-system   metrics-server-5f5fbb69b-xkbs5                 2/2     Running   0          10m
 ```
-
-
+and namespaces with the following:
 ```
 $ kubectl get namespaces
 NAME              STATUS   AGE
@@ -354,42 +314,46 @@ kube-public       Active   13m
 kube-system       Active   13m
 ```
 
-we can see that we havent deployed the app yet
+We could also check that the application had not been deployed on Kubernetes yet:
 ```
 $ kubectl get pods
 No resources found in default namespace.
 ```
 
+### Deploy FastAPI application to AKS
 
-### Deploy FastAPI application and Postgres database to K8s on Azure
+I created `deployment.yml` and `service.yml` to deploy the FastAPI container to AKS and expose it using a Kubernetes load balancer service. The PostgreSQL database was not deployed to Kubernetes, as it was hosted separately using Azure Database for PostgreSQL:
+```
+kubectl apply -f k8s/
+``` 
 
-create `deployment.yml`, `service.yml`, `db_deployment.yml`, `db_service.yml`, 
-
-run `kubectl apply -f k8s/` to create the deployment and service
-
-
+Afterwards, I verified that the application was indeed in service by running the following to show the live pods:
 ```
 $ kubectl get pods
 NAME                                      READY   STATUS                       RESTARTS   AGE
 booksdb-api-deployment-7b4ffb45c9-wcs6l   1/1     Running                      0          74s
 ```
-
+and the following to show the live services:
 ```
 $ kubectl get services
 NAME                  TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)        AGE
 booksdb-api-service   LoadBalancer   10.0.133.121   20.70.74.200   80:32130/TCP   16s
 kubernetes            ClusterIP      10.0.0.1       <none>         443/TCP        3h30m
-
 ```
 
+To explore the logs and potential errors, I ran the following:
+```
+kubectl logs <pod_name>
+```
 
-run `kubectl logs <pod_name>` to check for errors
+Finally, I queried the external IP to confirm that the deployed API could reach the managed PostgreSQL database:
+![]()
 
-navigate to external IP to see app and database
+### Firewall configuration
 
-remember to configure firewall
+Since the database was hosted on Azure, I ran into `timeout` errors before changing the AKS firewall configurations.
 
-get ip
+To address the error, I first got the IP address by running:
 ```
 AKS_OUTBOUND_IP=$(az network public-ip show \
   --ids $(az aks show \
@@ -402,8 +366,7 @@ AKS_OUTBOUND_IP=$(az network public-ip show \
 
 echo $AKS_OUTBOUND_IP
 ```
-
-paste ip here
+and then the following:
 ```
 az postgres flexible-server firewall-rule create \
   --resource-group portfolio-rg \
